@@ -23,8 +23,8 @@ try {
     }
   }
 } catch { /* .env optional */ }
-// Hard guarantee (per spec):
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:/home/z/my-project/db/custom.db';
+// Hard guarantee (portable — relative to prisma/schema.prisma):
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:../db/custom.db';
 
 import { PrismaClient } from '@prisma/client';
 import * as XLSX from 'xlsx';

@@ -1,5 +1,6 @@
-// Seed script — creates default users. Run: bun scripts/seed.mjs
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:/home/z/my-project/db/custom.db'
+// Seed script — creates default users. Run: node scripts/seed.mjs
+// Portable fallback (relative to prisma/schema.prisma):
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:../db/custom.db'
 import { PrismaClient } from '@prisma/client'
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 

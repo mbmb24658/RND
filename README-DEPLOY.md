@@ -54,15 +54,33 @@ Document (entityType + entityId — چندریختی)
 ActivityLog (FK userId)
 ```
 
-## 🚀 اجرای محلی
+## 🚀 اجرای محلی (ویندوز / لینوکس / مک)
+
+**پیش‌نیاز:** نصب [Node.js نسخه ۲۰٫۹ یا بالاتر](https://nodejs.org) (نسخه LTS مثل ۲۰ یا ۲۲). نیازی به Bun نیست — از `npm` استفاده کنید.
 
 ```bash
-bun install
-bun run db:push          # ایجاد جداول
-bun scripts/seed.mjs     # کاربران پیش‌فرض
-bun scripts/etl.mjs      # مهاجرت داده از upload/DB.xlsx (اختیاری — دیتابیس همراه پروژه آماده است)
-bun run dev              # http://localhost:3000
+# ۱) فایل .env را از نمونه بسازید (فقط بار اول)
+copy .env.example .env        # در ویندوز (cmd)
+# cp .env.example .env        # در لینوکس/مک
+
+# ۲) نصب وابستگی‌ها (پرisma generate به‌صورت خودکار اجرا می‌شود)
+npm install
+
+# ۳) ایجاد جداول دیتابیس (اگر db/custom.db از قبل موجود باشد، بدون تغییر می‌ماند)
+npm run db:push
+
+# ۴) کاربران پیش‌فرض (فقط بار اول و اگر دیتابیس خالی است)
+npm run db:seed
+
+# ۵) مهاجرت داده از upload/DB.xlsx (اختیاری — دیتابیس همراه پروژه آماده است)
+npm run db:etl
+
+# ۶) اجرای برنامه
+npm run dev                   # http://localhost:3000
 ```
+
+> 💡 دیتابیس `db/custom.db` همراه پروژه ارسال شده و **۶۲۸ رکورد مهاجرت‌یافته** دارد؛ اگر فایل را حذف نکنید، نیازی به `db:etl` نیست.
+> برای ساخت نسخه production: `npm run build` و سپس `npm run start`.
 
 ## ☁️ انتشار روی GitHub + Vercel
 
