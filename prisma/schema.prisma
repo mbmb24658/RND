@@ -1,0 +1,240 @@
+// =====================================================================
+//  R&D Project & Proposal Management System — Prisma Schema
+//  مهندسی معکوس‌شده از فایل DB.xlsx (628 رکورد × 68 ستون)
+//  تمام مبالغ بر حسب «ریال» (BigInt) و همه تاریخ‌ها به صورت ISO ذخیره
+//  و در لایه نمایش به «هجری شمسی» تبدیل می‌شوند.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------- Users & Roles --------------------------
+// role: ADMIN | PROJECT_CONTROL | SUPERVISOR
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String // scrypt hash
+  fullName  String
+  role      String   @default("SUPERVISOR") // ADMIN / PROJECT_CONTROL / SUPERVISOR
+  email     String?
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supervisedProjects Project[]     @relation("Supervisor")
+  createdProjects    Project[]     @relation("ProjectAuthor")
+  evaluations        Evaluation[]
+  payments           Payment[]
+  extensions         Extension[]
+  documents          Document[]
+  activityLogs       ActivityLog[]
+}
+
+// ---------------------------- Institutes -----------------------------
+// نام مؤسسه یا دانشگاه (نرمال‌شده از ستون «نام مؤسسه یا دانشگاه»)
+model Institute {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  projects  Project[]
+}
+
+// ----------------------------- Projects ------------------------------
+// kind: PROJECT (پروژه دارای قرارداد) | PROPOSAL (پروپوزال/بدون قرارداد)
+// status: ACTIVE (فعال) | COMPLETED (خاتمه‌یافته) | TERMINATED (فسخ‌شده)
+//         CANCELLED (باطل‌شده) | INACTIVE (غیرفعال)
+model Project {
+  id             String    @id @default(cuid())
+  kind           String    @default("PROJECT") // PROJECT / PROPOSAL
+  code           String    @unique // کد پروژه — شناسه یکتا (PK منطقی)
+  archiveNumber  String? // شماره بایگانی
+  contractNumber String? // شماره قرارداد
+  contractDate   DateTime? // تاریخ قرارداد
+  title          String // عنوان پروژه
+  notes          String? // توضیحات
+  amount         BigInt    @default(0) // مبلغ پروژه (ریال)
+  durationMonths Float? // مدت زمان پروژه (ماه)
+  groupName      String? // نام گروه
+  registrationDate DateTime? // تاریخ ثبت
+  executorName   String? // نام مجری
+  managerName    String? // نام مدیر پروژه
+  caseManager    String? // مسئول پرونده
+  companyName    String? // نام شرکت
+  researchType   String? // نوع طرح: كاربردي/تحقيقاتي/توسعه‌اي/بنيادي/اجرايي
+  status         String    @default("ACTIVE") // وضعیت پروژه
+  statusNote     String? // توضیح وضعیت (متن خام اکسل)
+  finalStatusNote String? // وضعیت نهایی (متن خام اکسل)
+  startDate      DateTime? // تاریخ شروع به کار مجری
+  endDate        DateTime? // تاریخ پایان کار مجری
+  startLetterNumber String? // شماره نامه شروع به کار
+  financeReferralDate   DateTime? // تاریخ معرفی پروژه به امور مالی
+  financeReferralNumber String? // شماره نامه معرفی به امور مالی
+  seminarDate    DateTime? // تاریخ سمینار
+  settlementDate DateTime? // تاریخ تسویه حساب
+  supervisionType String? // نوع نظارت: كارمند شركت/اشخاص حقيقي/اشخاص حقوقي
+  supervisionFee BigInt    @default(0) // مبلغ نظارت (ریال)
+  supervisionPaidAt DateTime? // تاریخ پرداخت حق‌الزحمه نظارت
+  supervisionLetterNumber String? // شماره نامه پرداخت نظارت
+  plannedProgress Float? // درصد پیشرفت برنامه
+  actualProgress  Float? // درصد پیشرفت واقعی
+  totalPaid      BigInt    @default(0) // مجموع پرداخت‌های ثبت‌شده (ریال)
+  totalPaidLegacy String? // مبلغ پرداخت‌شده تا کنون (متن خام اکسل)
+  bankAccountNote String? // شماره حساب و بانک (متن خام اکسل)
+  hasRegulation          Boolean @default(false) // آئین‌نامه
+  hasPrepaymentGuarantee Boolean @default(false) // تضمین پیش‌پرداخت
+  hasGoodPerformance     Boolean @default(false) // حسن انجام کار
+  hasGuaranteeRefund     Boolean @default(false) // استرداد تضمین
+  yesNo                  Boolean @default(false) // آری/خیر
+
+  instituteId  String?
+  institute    Institute? @relation(fields: [instituteId], references: [id])
+  supervisorNames String? // نام ناظرین (متن خام اکسل، برای داده‌های مهاجرت‌شده)
+  supervisorId String?
+  supervisor   User?      @relation("Supervisor", fields: [supervisorId], references: [id])
+  authorId     String?
+  author       User?      @relation("ProjectAuthor", fields: [authorId], references: [id])
+
+  payments    Payment[]
+  extensions  Extension[]
+  items       ProjectItem[]
+  evaluations Evaluation[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status])
+  @@index([groupName])
+  @@index([kind])
+}
+
+// ------------------------ Payments (مالی) ----------------------------
+// type: PROGRESS (پیشرفت) | PREPAYMENT (پیش‌پرداخت) | SETTLEMENT (تسویه)
+//       | SUPERVISION (حق‌نظارت) | OTHER (سایر)
+model Payment {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  amount         BigInt // مبلغ (ریال)
+  netAmount      BigInt? // مبلغ خالص
+  type           String    @default("PROGRESS")
+  subject        String? // عنوان نامه
+  letterNumber   String? // شماره نامه
+  date           DateTime? // تاریخ نامه
+  documentNumber String? // شماره سند
+  documentDate   DateTime? // تاریخ سند
+  note           String?
+  isLegacy       Boolean   @default(false) // رکورد مهاجرت‌شده از اکسل
+  createdById    String?
+  createdBy      User?     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+// ------------------------ Extensions (تمدید) -------------------------
+model Extension {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  months      Float? // مدت تمدید (ماه)
+  days        Float? // مدت تمدید (روز) — در صورتی‌که در اکسل بر حسب روز بود
+  date        DateTime? // تاریخ تمدید
+  rawValue    String? // مقدار خام اکسل برای شفافیت
+  note        String?
+  isLegacy    Boolean   @default(false)
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+// ------------------- Project Items (کالا و مواد) ---------------------
+model ProjectItem {
+  id                 String  @id @default(cuid())
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name               String // نام کالا یا مواد مورد نیاز
+  quantity           Float? // مقدار
+  unit               String? // واحد
+  unitPriceRial      BigInt? // قیمت واحد ریالی
+  unitPriceCurrency  Float? // قیمت واحد ارزی
+  totalPriceRial     BigInt? // قیمت کل ریالی
+  totalPriceCurrency Float? // قیمت کل ارزی
+  isConsumable       Boolean? // کالای مصرفی
+  internalSource     String? // منبع داخلی
+  externalSource     String? // منبع خارجی
+  activityRow        String? // ردیف فعالیت مرتبط
+  isLegacy           Boolean @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// ------------------------ Evaluations (ارزیابی) ----------------------
+// هر معیار 0 تا 20 امتیاز → جمع 100 → درجه: عالی(≥85)/خوب(≥70)/متوسط(≥50)/ضعیف
+// targetType: PROJECT | PROPOSAL
+model Evaluation {
+  id               String   @id @default(cuid())
+  targetType       String   @default("PROJECT")
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evaluatorId      String?
+  evaluator        User?    @relation(fields: [evaluatorId], references: [id])
+  technical        Int      @default(0) // کیفیت فنی و علمی
+  management       Int      @default(0) // مدیریت و زمان‌بندی
+  financial        Int      @default(0) // بودجه و بهینه‌سازی هزینه
+  innovation       Int      @default(0) // نوآوری و خلاقیت
+  documentation    Int      @default(0) // مستندسازی و گزارش‌دهی
+  totalScore       Float    @default(0)
+  grade            String? // عالی / خوب / متوسط / ضعیف
+  performanceTrend String? // بهبود / ثابت / نزولی
+  comment          String?
+  isLegacy         Boolean  @default(false)
+  evaluatedAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([evaluatorId])
+}
+
+// ------------------------ Documents (مستندات) ------------------------
+model Document {
+  id           String   @id @default(cuid())
+  title        String
+  entityType   String // PROJECT / PROPOSAL / PAYMENT / EVALUATION
+  entityId     String
+  fileName     String // نام اصلی فایل
+  filePath     String // مسیر ذخیره روی دیسک
+  mimeType     String?
+  size         Int      @default(0)
+  isLegacy     Boolean  @default(false)
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// ------------------------ Activity Log (گزارش تغییرات) ---------------
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String // CREATE / UPDATE / DELETE / LOGIN / MIGRATE
+  entityType  String // PROJECT / PAYMENT / EXTENSION / EVALUATION / DOCUMENT / USER
+  entityId    String?
+  entityTitle String?
+  details     String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}
